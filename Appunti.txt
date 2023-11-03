@@ -1,0 +1,103 @@
+Appunti per Virtual CPU
+
+formato istruzioni: fisso (vedi RiSC-16)
+
+flags?: Parity, Zero, Carry
+
+RISC 16 bit
+https://user.eng.umd.edu/~blj/risc/RiSC-isa.pdf (no stack, calls tramite jalr, NOP e HALT ottenibili combinando una o più istruzioni ...)
+
+memoria: 64k word (128kbytes)
+memory mapped I/O da 0xF000 a 0xFFFD
+
+screen: 
+256x256 mono graphic mode (4k words)
+40x20 mono text mode (PC like map char + attribute, charmap?) (800 words)
+
+"Krugerputer" memory map draft
+0x0000-0x0EFF - unassigned addresses (4K-256 == 3840 words)
+
+0x0F00-0x0FF1 - timer/clock ticks? 
+0x0FF2-0x0FFF - other system variables (keyboard buffer?) - 254 words 
+0x1000-0x9FFF - data RAM 9K words
+0xA000-0xAFFF - code RAM 4k words
+
+0xB000-0xCFFF - unassigned addresses (ROMS?) 8K words
+
+0xD000-0xDFFF - screen graphic (frame buffer mono, for now ) 4K
+
+0xE000-0xE18F - screen text - 800 words
+0xE190-0xE191 - video registers 
+0xE192-0xEFFF - free addresses for video (charmap?)
+
+0xF000 - keyboard I/O port(s)?
+0xF001-0xFFFD - free addresses (other Memory mapped I/O ports?)
+
+0xFFFE - execution start address (init 0xA000)
+0xFFFF - unused address (error? Exception?)
+
+
+
+main loop
+scheduler?
+- task (temporizzato?) fetch and execute
+- sw/hw interrupt task (praticamente è in polling)
+- other idle/background tasks (cosa? DMA? I/O? frame buffer to display update?)
+
+template: 
+while (1) {
+    fetch_instruction()
+    execute_instruction()
+    if (there_is_interrupt())
+        do_serve_interrupt
+    do_other_background_idle_tasks()
+}
+
+RiSC-16 instruction Set
+RRR instructions: 
+OOO AAA BBB 0000 CCC
+
+ADD rA, rB, rC ; ADD
+000 AAA BBB 0000 CCC
+rA <- rB + rC
+
+NAND rA, rB, rC ; NAND
+010 AAA BBB 0000 CCC
+rA <- rB NAND rC
+
+
+
+
+RRI instructions: 
+OOO AAA BBB IIIIIII ; IIIIIII signed int -64..+63
+
+ADDI rA, rB, X ; ADD Immediate
+001 AAA BBB XXXXXXX
+rA <- rB + X
+
+SW rA, rB, X ; Store Word to RAM
+100 AAA BBB XXXXXXX
+[rB + X] <- rA 
+
+LW rA, rB, X ; Load Word from RAM
+101 AAA BBB XXXXXXX
+rA <- [rB + X] 
+
+BEQ rA, rB, X ; Branch if Equal 
+110 AAA BBB XXXXXXX
+(rA == rB) ? PC <- PC + 1 + X : PC <- PC + 1 ;  PC == indirizzo istruzione BEQ 
+
+JALR rA, rB ; Jump And Link Register ; RRI type, (, 0) sottinteso ; 
+111 AAA BBB 0000000
+rA <- PC + 1 , PC <- rB ; PC == indirizzo istruzione JALR 
+
+
+
+
+RI instructions: 
+OOO AAA IIIIIIIIII
+
+LUI rA, X ; Load Upper Immediate 
+011 AAA XXXXXXXXXX
+rA <- X << 6
+
