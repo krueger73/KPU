@@ -1,6 +1,7 @@
-/* KaPUt - Krueger Didactical CPU */
+/* KPU - Krueger Didactical CPU */
 
 #include "kconfig.h"
+#include "kpu.h"
 
 /* KPU flag ZERO position */
 #define KFZERO    0
@@ -35,9 +36,46 @@
 #define KI_BEQ  (6u)
 #define KI_JALR (7u)
 
+/* Instruction Manager function pointer, receives CPU and Memory pointers */
+typedef void(*KPU_FMgm_t)(kpu_t*, kword_t*);
+
+/* instructions managers prototypes */
+static void KI_ADDMgm(kpu_t* k, kword_t* m);
+static void KI_ADDIMgm(kpu_t* k, kword_t* m);
+static void KI_NANDMgm(kpu_t* k, kword_t* m);
+static void KI_LUIMgm(kpu_t* k, kword_t* m);
+static void KI_SWMgm(kpu_t* k, kword_t* m);
+static void KI_LWMgm(kpu_t* k, kword_t* m);
+static void KI_BEQMgm(kpu_t* k, kword_t* m);
+static void KI_JALRMgm(kpu_t* k, kword_t* m);
+
+/* uty prototypes */
+/* fetch generic data word from memory */
+static kword_t KPU_FetchWord(kword_t* m, kaddr_t a);
+/* store generic data word to memory */
+static void KPU_StoreWord(kword_t* m, kaddr_t a, kword_t w);
+
+/* fetch instruction word from memory [PC] -> IR */
+static void KPU_FetchInstr(kword_t* m, kpu_t* k);
+/* execute instruction in IR, update PC */
+static void KPU_ExecInstr(kword_t* m, kpu_t* k);
+
+
+/* Instruction managers */
+KPU_FMgm_t K_InstMgr[8] = {
+  KI_ADDMgm,
+  KI_ADDIMgm,
+  KI_NANDMgm,
+  KI_LUIMgm,
+  KI_SWMgm,
+  KI_LWMgm,
+  KI_BEQMgm,
+  KI_JALRMgm
+};
+
 #ifdef K_DEBUG
 const char* mnemonic[8] = {
-  "ADD ", 
+  "ADD ",
   "ADDI ",
   "NAND ",
   "LUI ",
@@ -48,94 +86,6 @@ const char* mnemonic[8] = {
 };
 #endif
 
-typedef struct {
-  /* user registers */
-  kword_t R[8]; /* Registers r0..r7 */
-  /* CPU flags: TBD */
-  kbyte_t F; 
-  /* CPU stack pointer: TBD */
-  kaddr_t SP;  
-  /* internal instruction register */
-  kinstr_t IR;
-  /* Internal Program Counter */
-  kaddr_t PC;
-} kpu_t;
-
-/* Instruction Manager function pointer, receives CPU and Memory pointers */
-typedef void(*KPU_FMgm_t)(kpu_t*, kword_t*);
-
-/* instructions managers prototypes */
-void KI_ADDMgm(kpu_t* k, kword_t* m);
-void KI_ADDIMgm(kpu_t* k, kword_t* m);
-void KI_NANDMgm(kpu_t* k, kword_t* m);
-void KI_LUIMgm(kpu_t* k, kword_t* m);
-void KI_SWMgm(kpu_t* k, kword_t* m);
-void KI_LWMgm(kpu_t* k, kword_t* m);
-void KI_BEQMgm(kpu_t* k, kword_t* m);
-void KI_JALRMgm(kpu_t* k, kword_t* m);
-
-
-/* globals */
-
-/* cpu(s) */
-kpu_t cpu0;
-/* installed memory */
-kword_t m[KPUMEMSIZE]; 
-
-/* Instruction managers */
-KPU_FMgm_t K_InstMgr[8] = {  
-  KI_ADDMgm, 
-  KI_ADDIMgm, 
-  KI_NANDMgm, 
-  KI_LUIMgm, 
-  KI_SWMgm, 
-  KI_LWMgm, 
-  KI_BEQMgm, 
-  KI_JALRMgm
-};
-
-/* uty prototypes */
-/* cpu cold reset */
-void KPU_CpuReset(kpu_t *k);
-/* memory clean to 0xff */
-void KPU_MemReset(kword_t*m);
-/* CPU main loop fetch and execute */
-void KPU_MainLoop(kpu_t* k, kword_t* m);
-
-/* fetch generic data word from memory */
-kword_t KPU_FetchWord(kword_t* m, kaddr_t a); 
-/* store generic data word to memory */
-void KPU_StoreWord(kword_t* m, kaddr_t a, kword_t w);
-
-/* fetch instruction word from memory [PC] -> IR */
-void KPU_FetchInstr(kword_t* m, kpu_t* k);
-/* execute instruction in IR, update PC */
-void KPU_ExecInstr(kword_t* m, kpu_t* k);
-
-int main()
-{
-  int d = 0xA000;
-
-  KPU_MemReset(m);
-  m[KPUSTARTEXECADDR] = 0x6680; /* LUI r1, 0x280 ; 0x280 == 0xA000 >> 6 */
-  m[KPUSTARTEXECADDR+1] = 0xE080; /* JARL r0, r1 ; jump r1 */
-  
-  /* TODO: memory init / ROM load / program load */
-  m[d++] = 0x6B7A; /* LUI r2, 0x37A */
-  m[d++] = 0x292D; /* ADDI r2, r2, 0x2D - 0xDEAD */
-  m[d++] = 0x6EFB; /* LUI r3, 0x2FB */
-  m[d++] = 0x2DAF; /* ADDI r3, r3, 0x2F - 0xBEEF */
-  m[d++] = 0x0103; /* ADD r0, r2, r3 */
-  m[d++] = 0x0503; /* ADD r1, r2, r3 */
-  m[d++] = 0x0582; /* ADD r1, r3, r2 */
-  m[d++] = 0x0800; /* ADD r2, r0, r0 */
-  m[d++] = 0xE000; /* jalr r0, r0 ; HALT */
-
-  KPU_CpuReset(&cpu0);
-  KPU_MainLoop(&cpu0, m);
-
-  return 0;
-}
 
 void KPU_CpuReset(kpu_t* k) {
   K_DEBUGMSG("KPU_CpuReset.");
@@ -174,28 +124,29 @@ void KPU_MainLoop(kpu_t* k, kword_t* m) {
   }
 }
 
-void KPU_FetchInstr(kword_t* m, kpu_t* k) {
-  /* load next instruction in IR - esplicit cast */
+static void KPU_FetchInstr(kword_t* m, kpu_t* k) {
+  /* load next instruction in IR - explicit cast */
   k->IR = (kinstr_t)KPU_FetchWord(m, k->PC);  
 }
 
-kword_t KPU_FetchWord(kword_t* m, kaddr_t a) {
+static kword_t KPU_FetchWord(kword_t* m, kaddr_t a) {
   kword_t locRes = 0xDEAD;
   kaddr_t locAddr = a;
   
-  /* simple fetch 8 bits word from m[a] */
-  locRes = m[locAddr];
+  /* simple fetch 1 word from m[a] */
+  locRes = m[locAddr]; 
+
   return locRes;
 }
 
-void KPU_StoreWord(kword_t* m, kaddr_t a, kword_t w) {
+static void KPU_StoreWord(kword_t* m, kaddr_t a, kword_t w) {
   kword_t locData = w;
   kaddr_t locAddr = a;
 
   m[locAddr] = locData;
 }
 
-void KPU_ExecInstr(kword_t* m, kpu_t* k) {  
+static void KPU_ExecInstr(kword_t* m, kpu_t* k) {
   int opcode = (k->IR >> 13);
 
   if (K_InstMgr[opcode] == NULL) {
@@ -208,7 +159,7 @@ void KPU_ExecInstr(kword_t* m, kpu_t* k) {
 }
 
 /* instructions managers */
-void KI_ADDMgm(kpu_t* k, kword_t* m) {
+static void KI_ADDMgm(kpu_t* k, kword_t* m) {
   /* ADD rA, rB, rC */
   int A, B, C; 
   kdword_t locTempRes;
@@ -226,15 +177,15 @@ void KI_ADDMgm(kpu_t* k, kword_t* m) {
   }
   else {
     /* TODO: eccezione, istruzione non valida */
-    K_DEBUGMSG("KI_ADDMgm: instruction format invalid\n");
+    K_DEBUG1ARG("KI_ADDMgm: instruction '0x%04X' invalid\n", k->IR);
   }
 }
 
-void KI_ADDIMgm(kpu_t* k, kword_t* m) {
+static void KI_ADDIMgm(kpu_t* k, kword_t* m) {
   /* ADDI rA, rB, X */
   int A, B, X;
   kdword_t locTempRes;
-
+  
   A = KGETRA(k->IR);
   if (A != 0) {
     B = KGETRB(k->IR);
@@ -247,7 +198,7 @@ void KI_ADDIMgm(kpu_t* k, kword_t* m) {
   /* TODO: flags management */
 }
 
-void KI_LUIMgm(kpu_t* k, kword_t* m) {
+static void KI_LUIMgm(kpu_t* k, kword_t* m) {
   /* LUI rA, X */
   int A,  X;
   kdword_t locTempRes;
@@ -260,7 +211,7 @@ void KI_LUIMgm(kpu_t* k, kword_t* m) {
   }
 }
 
-void KI_JALRMgm(kpu_t* k, kword_t* m) {
+static void KI_JALRMgm(kpu_t* k, kword_t* m) {
   /* JALR rA, rB */
   int A, B;
   
@@ -270,9 +221,8 @@ void KI_JALRMgm(kpu_t* k, kword_t* m) {
     B = KGETRB(k->IR);
     if ((A == 0) && (B == 0)) {
       /* HALT instruction */
-      /* DUMP registers & HALT */
-      K_DEBUGMSG("HALT!\n");
-      K_DEBUG1ARG("CPU dump: R0: 0x%04X ", k->R[0]);
+      /* DUMP registers & HALT */      
+      K_DEBUG1ARG("\nCPU dump: R0: 0x%04X ", k->R[0]);
       K_DEBUG1ARG("R1: 0x%04X ", k->R[1]);
       K_DEBUG1ARG("R2: 0x%04X ", k->R[2]);
       K_DEBUG1ARG("R3: 0x%04X ", k->R[3]);
@@ -282,25 +232,24 @@ void KI_JALRMgm(kpu_t* k, kword_t* m) {
       K_DEBUG1ARG("R7: 0x%04X ", k->R[7]);
       K_DEBUG1ARG("F: 0x%04X ", k->F);
       K_DEBUG1ARG("PC: 0x%04X\n", k->PC);
+      K_DEBUGMSG("HALT!\n");
       /* HALT */
       for (;;);
     }
     else {
-      if (A != 0) {
-        /* rA <- PC + 1 */
-        KSETREG(k, A, k->PC); /* PC punta già all'istruzione successiva */
-      }
+      /* rA <- PC + 1 */
+      KSETREG(k, A, k->PC); /* PC punta già all'istruzione successiva */      
       k->PC = KGETREG(k, B); /* WARNING? b può essere r0 -> PC == 0 */
       /* TODO: flags management */
     }
   }
   else {
     /* TODO: eccezione, istruzione non valida */
-    K_DEBUGMSG("KI_JALRMgm: instruction format invalid\n");
+    K_DEBUG1ARG("KI_JALRMgm: instruction '0x%04X' invalid\n", k->IR);    
   }
 }
 
-void KI_NANDMgm(kpu_t* k, kword_t* m) {
+static void KI_NANDMgm(kpu_t* k, kword_t* m) {
   /* NAND rA, rB, rC */
   int A, B, C;
   kword_t locTempRes;
@@ -319,11 +268,11 @@ void KI_NANDMgm(kpu_t* k, kword_t* m) {
   }
   else {
     /* TODO: eccezione, istruzione non valida */
-    K_DEBUGMSG("KI_NANDMgm: instruction format invalid\n");
+    K_DEBUG1ARG("KI_NANDMgm: instruction '0x%04X' invalid\n", k->IR);    
   }
 }
 
-void KI_SWMgm(kpu_t* k, kword_t* m) {
+static void KI_SWMgm(kpu_t* k, kword_t* m) {
   /* SW rA, rB, X */
   int A, B, X;
   kdword_t locTempRes;
@@ -335,12 +284,11 @@ void KI_SWMgm(kpu_t* k, kword_t* m) {
   X = ((X < 64) ? X : (X - 128));
 
   locTempRes = (kdword_t)KGETREG(k, B) + X;
-  m[locTempRes] = KGETREG(k, A);
-
+  KPU_StoreWord(m, locTempRes, KGETREG(k, A));  
   /* TODO: flags management */
 }
 
-void KI_LWMgm(kpu_t* k, kword_t* m) {
+static void KI_LWMgm(kpu_t* k, kword_t* m) {
   /* LW rA, rB, X */
   int A, B, X;
   kdword_t locTempRes;
@@ -353,15 +301,14 @@ void KI_LWMgm(kpu_t* k, kword_t* m) {
     X = ((X < 64) ? X : (X - 128));
 
     locTempRes = (kdword_t)KGETREG(k, B) + X;
-    KSETREG(k, A, m[locTempRes]);    
+    KSETREG(k, A, KPU_FetchWord(m ,locTempRes));
   }
   /* TODO: flags management */
 }
 
-void KI_BEQMgm(kpu_t* k, kword_t* m) {
+static void KI_BEQMgm(kpu_t* k, kword_t* m) {
   /* BEQ rA, rB, X */  
-  int A, B, X;
-  kdword_t locTempRes;
+  int A, B, X;  
 
   A = KGETRA(k->IR);
   B = KGETRB(k->IR);

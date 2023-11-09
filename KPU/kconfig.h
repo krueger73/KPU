@@ -37,7 +37,7 @@ typedef kword_t   kinstr_t; /* KPU instruction base type */
 
 #define KPUMEMLASTWORD (KPUMEMSIZE-1) /* last word address */
 
-#define KPUSTARTEXECADDR (KPUMEMSIZE-KPUPTRSIZE)  /* 0xFFFE - PC init at reset */
+#define KPUSTARTEXECADDR (KPUMEMSIZE-2)  /* 0xFFFE - PC init at reset */
 #define KPUSTARTSTACKADDR (KPUMEMSIZE>>1)         /* stack initially placed at half mem size - 0x8000 - SP init at reset */
 
 #endif
