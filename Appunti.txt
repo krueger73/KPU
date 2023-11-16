@@ -101,3 +101,50 @@ LUI rA, X ; Load Upper Immediate
 011 AAA XXXXXXXXXX
 rA <- X << 6
 
+
+
+TODO: 
+decodificare le istruzioni macchina a scopo di debug
+scrivere dei test sul Software scritto, per tenerne sotto controllo il corretto funzionamento durante gli sviluppi
+scrivere un monitor (host) con i comandi compatibili con debug/gdb
+scrivere un programma (macro)assembler, per la produzione di codice macchina partendo da un file contenente codice sorgente assembly
+realizzare un'applicazione desktop che faccia da monitor/loader/debugger
+dotare KPU di I/O, come una console testuale e un display grafico
+usando il linguaggio assembly, costruire un programma monitor/loader/debugger, stavolta nativo ed eseguito su KPU stessa
+provare a scrivere e a far eseguire piccole applicazioni didattiche. 
+
+
+assembler
+formato riga: 
+
+[label:]opcode/.dir par1[, par2, par3] [; comment]
+
+direttive
+[label:].dir1 par1
+[label:].fill imm ; immediato 16 bit o label 
+[label:].space n ; scrive n zeri in memoria 
+
+
+macro/pseudo instructions 
+nop -> add r0, r0, r0
+halt -> jalr r0, r0, imm ; use a non-zero immediate 
+lli rA, imm -> addi rA, rA, imm & 0x3f (6 bit, segno escluso)
+movi rA, imm -> lui + lli instructions 
+
+
+par
+registri
+r0..r7
+immediato
+(decimal?)/$HEXCODE/%BINCODE/label
+jalr se c'è immediato, DEVE essere zero 
+
+
+LUI immediato su 16 bit o label 
+rA <- I & 0xffc0
+
+
+Interrupts: 
+if interrupts are enabled, 0x0000-0x000f memory addresses contains interrupt vectors (syscall)
+callable via JALR immediate (HALT is one of them)
+syscall are returnable or not (like HALT that hapts the system)

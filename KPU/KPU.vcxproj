@@ -127,11 +127,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="kdecode.c" />
     <ClCompile Include="KPU.c" />
     <ClCompile Include="main_app.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kconfig.h" />
+    <ClInclude Include="kdecode.h" />
     <ClInclude Include="KPU.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
